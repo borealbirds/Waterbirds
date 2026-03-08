@@ -19,6 +19,7 @@ library(avilistr) #species wrangling
 library(lme4) #mixed effects models
 library(MuMIn) #dredging
 library(flexmix) #Gaussian mixture models
+library(dismo) #BRTs
 
 #2. Set root path----
 root <- "G:/Shared drives/BAM_WaterbirdModels"
@@ -26,7 +27,7 @@ root_data <- "G:/Shared drives/BAM_AvianData"
 root_covs <- "G:/Shared drives/BAM_NationalModels5/CovariateRasters"
 
 #3. Load data object ----
-load(file.path("BAMDataset", "04_BAMDataset_WT-2026-03-02_EBd-Jan-2026.Rdata"))
+load(file.path(root_data, "BAMDataset", "04_BAMDataset_WT-2026-03-02_EBd-Jan-2026.Rdata"))
 
 #4. Authenticate WildTrax ----
 source("WTlogin.R")
@@ -58,21 +59,16 @@ spp_avi <- avilist_2025_short |>
   dplyr::filter(Family %in% fam)
 
 #3. Put together ----
-#Retain unidentifieds ----
-unid <- c("UNCO", "UDOW", "UGOL", "UMAB", "UNGA", "UNLO", "UNSC", "UNWT", "UNYE", "UPHL", "USCT", "USLD", "UTEA", "UWCG")
 spp <- spp_wt |> 
   inner_join(spp_avi) |> 
-  dplyr::select(all_of(colnames(spp_wt))) |> 
-  rbind(spp_wt |> 
-          dplyr::filter(species_code %in% unid)) |> 
-  inner_join(data.frame(species_code = colnames(dat))) 
-
+  inner_join(data.frame(species_code = colnames(dat))) |> 
+  dplyr::select(all_of(c(colnames(spp_wt), "Family")))
 
 #GET FLYOVER DATA ###############
 
 #This section could probably be less jenky....
 
-#1. GEt the WildTrax data ----
+#1. Get the WildTrax data ----
 load(file.path(root_data, "BAMDataset", "WildTrax", "2026-03-02", "01_wildtrax_raw_2026-03-02.Rdata"))
 pc <- do.call(rbind, pc.wt)
 
@@ -113,13 +109,17 @@ fo <- rbind(imbcr_fo |>
 table(fo$species_code)
 
 #7. Go get the non-flyover detections -----
+#Just waterbirds from the same surveys
 wt_nofo <- pc |> 
   dplyr::filter(project_id %in% wt_fo$project_id,
+                survey_id %in% wt_fo$survey_id,
                 species_code %in% fo$species_code)
 
 imbcr_nofo <- imbcr |> 
-  dplyr::filter(species %in% fo$species_code,
-                How!="F") |> 
+  inner_join(imbcr_fo |> 
+               dplyr::select(location, datetime) |> 
+               unique()) |> 
+  dplyr::filter(species %in% fo$species_code) |> 
   rename(species_code = species)
 
 #8. Put together again ----
@@ -141,12 +141,14 @@ all <- rbind(imbcr_nofo |>
                mutate(source = "WT")) |> 
   mutate(flyover = 0) |> 
   rbind(fo |> 
-          mutate(flyover = 1))
+          mutate(flyover = 1)) |> 
+  left_join(spp |> 
+              dplyr::select(species_code, Family))
 
 #9. Save out for GEE ----
 write.csv(all, file.path(root, "data", "WaterbirdFlyovers.csv"), row.names = FALSE)
 
-#MODEL ###################
+#MODEL - GLMS ###################
 
 #1. Get the covariates ----
 cov_pt <- read.csv(file.path(root, "data", "WaterbirdFlyovers_water_point.csv")) |> 
@@ -158,7 +160,7 @@ cov_pt <- read.csv(file.path(root, "data", "WaterbirdFlyovers_water_point.csv"))
          recur_pt = recurrence) |> 
   dplyr::select(-c(b1_2, change_abs, change_norm, transition, max_extent))
 
-cov_2km <- read.csv(file.path(root, "data", "WaterbirdFlyovers_water_20km.csv")) |> 
+cov_2km <- read.csv(file.path(root, "data", "WaterbirdFlyovers_water_2km.csv")) |> 
   dplyr::select(-c(system.index, .geo, count)) |> 
   rename(dry_2 = b1,
          class_2 = b1_1,
@@ -167,7 +169,7 @@ cov_2km <- read.csv(file.path(root, "data", "WaterbirdFlyovers_water_20km.csv"))
          recur_2 = recurrence) |> 
   dplyr::select(-c(b1_2, change_abs, change_norm, transition, max_extent))
 
-cov_20km <- read.csv(file.path(root, "data", "WaterbirdFlyovers_water_2km.csv")) |> 
+cov_20km <- read.csv(file.path(root, "data", "WaterbirdFlyovers_water_20km.csv")) |> 
   dplyr::select(-c(system.index, .geo, count)) |> 
   rename(dry_20 = b1,
          class_20 = b1_1,
@@ -179,8 +181,8 @@ cov_20km <- read.csv(file.path(root, "data", "WaterbirdFlyovers_water_2km.csv"))
 #2. Put things together ----
 all_cov <- all |> 
   inner_join(cov_pt) |> 
-  inner_join(cov_200m) |> 
   inner_join(cov_2km) |> 
+  inner_join(cov_20km) |> 
   mutate(across(c(occur_pt, occur_2, occur_20, recur_pt, recur_2, recur_20, season_pt, season_2, season_20), ~replace_na(.x, 0)),
          across(c(class_pt, class_2, class_20), ~as.factor(.x)))
 
@@ -200,24 +202,37 @@ ggplot(all_wide) +
   facet_wrap(~cov, scales="free")
 
 #Let's use:
-#Linear: occur_2, season_2, occur_20, season_20, recur_20
-#polynomial: dry_20
+#Linear: dry_pt, season_20
+#polynomial: occur_20, recur_2
+
+#4. Figure out polynomials ----
+
+#occur_20
+m_occur20_1 <- glm(flyover ~ occur_20, data=all_cov, family = "binomial")
+m_occur20_2 <- glm(flyover ~ poly(occur_20,2), data=all_cov, family = "binomial")
+AIC(m_occur20_1, m_occur20_2) #second order
+
+#recur_2
+m_recur2_1 <- glm(flyover ~ recur_2, data=all_cov, family = "binomial")
+m_recur2_2 <- glm(flyover ~ poly(recur_2,2), data=all_cov, family = "binomial")
+AIC(m_recur2_1, m_recur2_2) #second order
 
 #4. Model no RE ----
-glm1 <- glm(flyover ~ occur_2 + season_2 + occur_20 + season_20 + recur_20 + poly(dry_20),
+glm1 <- glm(flyover ~ dry_pt + poly(occur_20, 2) + poly(recur_2, 2) + season_20,
               data=all_cov,
               family="binomial",
               na.action = "na.fail")
 
 d1 <- dredge(glm1)
-glm2 <- glm(flyover ~ occur_2 + season_2 + season_20 + recur_20,
+glm2 <- glm(flyover ~ poly(occur_20, 2) + poly(recur_2, 2),
             data=all_cov,
             family="binomial",
             na.action = "na.fail")
 summary(glm2)
 
-#5. Model with RE ----
-glm3 <- glmer(flyover ~ occur_2 + season_2 + season_20 + recur_20 + (1|species_code),
+#5. Model with RE for family ----
+#I think this might want a random slope too
+glm3 <- glmer(flyover ~ poly(occur_20, 2) + poly(recur_2, 2) + (Family|Family),
               data=all_cov,
               family="binomial",
               na.action = "na.fail")
@@ -237,11 +252,12 @@ wide_pred <- all_pred |>
 #7. Look at some things ----
 ggplot(wide_pred) +
   geom_jitter(aes(x=prediction, y=flyover)) +
+  geom_smooth(aes(x=prediction, y=flyover)) +
   facet_wrap(~model, ncol=2, scales="free")
 
 #8. Use a Gaussian mixture model to find a truncation ----
 set.seed(1234)
-gmm <- flexmix(pred2 ~ 1 + species_code, data = all_pred, k=2, model = FLXMRglm(family = "gaussian"))
+gmm <- flexmix(pred3re ~ 1 + species_code, data = all_pred, k=2, model = FLXMRglm(family = "gaussian"))
 summary(gmm)
 
 #9. Get the membership probabilities ----
@@ -250,3 +266,21 @@ all_pred$gmm_fo <- clusters(gmm)
 
 #10. Look at some things ----
 table(all_pred$flyover, all_pred$gmm_fo)
+
+#MODEL - MACHINE LEARNING #############
+
+#1. Subset the data ----
+all_brt <- all_cov |> 
+  dplyr::select(flyover, dry_pt:season_20, Family)
+
+set.seed(1234)
+m.i <- dismo::gbm.step(data=all_brt,
+                       gbm.x=c(2:ncol(all_brt)),
+                       gbm.y=1,
+                       tree.complexity = 3,
+                       learning.rate = 0.01,
+                       family="binomial")
+  
+
+
+

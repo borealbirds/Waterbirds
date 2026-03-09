@@ -8,6 +8,8 @@
 
 #PURPOSE: This script determines how to filter out upland surveys from the BAM dataset for waterbird modelling.
 
+#TODO: Think about best approach, split out some testing data
+
 #PREAMBLE############################
 
 #1. Load packages----
@@ -20,11 +22,12 @@ library(lme4) #mixed effects models
 library(MuMIn) #dredging
 library(flexmix) #Gaussian mixture models
 library(dismo) #BRTs
+library(mgcv) #GAMs
+library(pROC) #AUC for model comparison
 
 #2. Set root path----
 root <- "G:/Shared drives/BAM_WaterbirdModels"
 root_data <- "G:/Shared drives/BAM_AvianData"
-root_covs <- "G:/Shared drives/BAM_NationalModels5/CovariateRasters"
 
 #3. Load data object ----
 load(file.path(root_data, "BAMDataset", "04_BAMDataset_WT-2026-03-02_EBd-Jan-2026.Rdata"))
@@ -112,14 +115,11 @@ table(fo$species_code)
 #Just waterbirds from the same surveys
 wt_nofo <- pc |> 
   dplyr::filter(project_id %in% wt_fo$project_id,
-                survey_id %in% wt_fo$survey_id,
                 species_code %in% fo$species_code)
 
 imbcr_nofo <- imbcr |> 
-  inner_join(imbcr_fo |> 
-               dplyr::select(location, datetime) |> 
-               unique()) |> 
-  dplyr::filter(species %in% fo$species_code) |> 
+  dplyr::filter(species %in% fo$species_code,
+                How!="F") |> 
   rename(species_code = species)
 
 #8. Put together again ----
@@ -148,7 +148,7 @@ all <- rbind(imbcr_nofo |>
 #9. Save out for GEE ----
 write.csv(all, file.path(root, "data", "WaterbirdFlyovers.csv"), row.names = FALSE)
 
-#MODEL - GLMS ###################
+#MODEL PREP ############
 
 #1. Get the covariates ----
 cov_pt <- read.csv(file.path(root, "data", "WaterbirdFlyovers_water_point.csv")) |> 
@@ -201,86 +201,173 @@ ggplot(all_wide) +
   geom_smooth(aes(x=val, y=flyover), method="lm") +
   facet_wrap(~cov, scales="free")
 
+#MODEL - GLMS ###################
+
 #Let's use:
-#Linear: dry_pt, season_20
-#polynomial: occur_20, recur_2
+#Linear: occur_2, recur_2,  season_2
+#polynomial: dry_20, season_20, recur_20, occur_20
 
-#4. Figure out polynomials ----
+#1. Figure out polynomials ----
 
-#occur_20
+#season_20
+m_season20_1 <- glm(flyover ~ season_20, data=all_cov, family = "binomial")
+m_season20_2 <- glm(flyover ~ poly(season_20,2), data=all_cov, family = "binomial")
+AIC(m_season20_1, m_season20_2) #second order
+
+#recur_20
+m_recur20_1 <- glm(flyover ~ recur_20, data=all_cov, family = "binomial")
+m_recur20_2 <- glm(flyover ~ poly(recur_20,2), data=all_cov, family = "binomial")
+AIC(m_recur20_1, m_recur20_2) #second order
+
 m_occur20_1 <- glm(flyover ~ occur_20, data=all_cov, family = "binomial")
 m_occur20_2 <- glm(flyover ~ poly(occur_20,2), data=all_cov, family = "binomial")
 AIC(m_occur20_1, m_occur20_2) #second order
 
-#recur_2
-m_recur2_1 <- glm(flyover ~ recur_2, data=all_cov, family = "binomial")
-m_recur2_2 <- glm(flyover ~ poly(recur_2,2), data=all_cov, family = "binomial")
-AIC(m_recur2_1, m_recur2_2) #second order
-
-#4. Model no RE ----
-glm1 <- glm(flyover ~ dry_pt + poly(occur_20, 2) + poly(recur_2, 2) + season_20,
+#2. Model no RE ----
+glm1 <- glm(flyover ~ poly(dry_20, 2) + poly(occur_20, 2) + poly(recur_20, 2) + poly(season_20, 2) + occur_2 + recur_2 + season_2 + factor(class_pt),
               data=all_cov,
               family="binomial",
               na.action = "na.fail")
 
 d1 <- dredge(glm1)
-glm2 <- glm(flyover ~ poly(occur_20, 2) + poly(recur_2, 2),
+
+glm2 <- glm(flyover ~ poly(dry_20, 2) + poly(occur_20, 2) + poly(recur_20, 2) + poly(season_20, 2) + recur_2 + season_2 + factor(class_pt),
             data=all_cov,
             family="binomial",
             na.action = "na.fail")
 summary(glm2)
 
-#5. Model with RE for family ----
+#3. Model with RE for family ----
 #I think this might want a random slope too
-glm3 <- glmer(flyover ~ poly(occur_20, 2) + poly(recur_2, 2) + (Family|Family),
+glm3 <- glmer(flyover ~ poly(dry_20, 2) + poly(occur_20, 2) + poly(recur_20, 2) + poly(season_20, 2) + occur_2 + recur_2 + season_2 + factor(class_pt) + (1|Family),
               data=all_cov,
               family="binomial",
               na.action = "na.fail")
 summary(glm3)
 
-#6. Make predictions ----
+#4. Make predictions ----
 all_pred <- data.frame(pred3 = predict(glm3, re.form = NA, type="response"),
                        pred3re = predict(glm3, type="response"),
                        pred2 = predict(glm2, type="response"),
                        pred = predict(glm1, type="response")) |> 
   cbind(all_cov)
 
-wide_pred <- all_pred |> 
-  dplyr::select(flyover, pred3, pred3re, pred2, pred) |> 
-  pivot_longer(pred3:pred, names_to="model", values_to="prediction")
+#MODEL - MACHINE LEARNING #############
 
-#7. Look at some things ----
+#1. Subset the data ----
+all_brt <- all_cov |> 
+  dplyr::select(flyover, dry_pt:season_20, Family) |> 
+  dplyr::select(-class_2, -class_20) |> 
+  mutate(Family = as.factor(Family))
+
+#2. Model ----
+set.seed(1234)
+m.i <- dismo::gbm.step(data=all_brt,
+                       gbm.x=c(2:ncol(all_brt)),
+                       gbm.y="flyover",
+                       tree.complexity = 3,
+                       learning.rate = 0.01,
+                       family="bernoulli")
+
+#3. Make predictions ----
+all_pred$predbrt <- dismo::predict(m.i, x = all_brt, type="response")
+
+#4. Look at some things ----
+summary(m.i)
+gbm.plot(m.i, smooth=TRUE)
+m.int <- gbm.interactions(m.i)
+
+#MODEL - GAM ###############
+
+#1. Subset the data ----
+all_gam <- all_cov |> 
+  dplyr::select(flyover, dry_20, occur_20, recur_20, season_20, season_2, class_pt, Family) |> 
+  mutate(Family = as.factor(Family),
+         flyover = as.factor(flyover))
+
+#2. Model ----
+gam1 <- bam(flyover ~ s(dry_20, k=3) + s(occur_20, k=7) + s(recur_20, k=7) + s(season_20, k=6) + s(season_2, k=4) +s(class_pt, bs="re") + s(Family, bs="re"),
+            data = all_gam,
+            family = binomial(),
+            gamma = 0.5)
+
+#3. Make predictions ----
+all_pred$predgam <- predict(gam1, type="response")
+
+#4. Look at some things ----
+summary(gam1)
+gam.check(gam1)
+plot.gam(gam1, pages = 1, se=FALSE)
+plot.gam(gam1, select=5, rug=TRUE, ylim=c(-3, 3))
+
+#MODEL SELECTION ##################
+
+#1. AUC ----
+auc_glm2 <- roc(all_pred$flyover, all_pred$pred2)$auc
+auc_glm3 <- roc(all_pred$flyover, all_pred$pred3)$auc
+auc_glm3re <- roc(all_pred$flyover, all_pred$pred3re)$auc
+auc_brt <- roc(all_pred$flyover, all_pred$predbrt)$auc
+auc_gam <- roc(all_pred$flyover, all_pred$predgam)$auc
+  
+#2. Logloss ----
+logloss <- function(y, p){
+  eps <- 1e-15
+  p <- pmin(pmax(p, eps),  1 - eps)
+  -mean(y * log(p) + (1-y) * log(1-p))
+}
+
+ll_glm2 <- logloss(all_pred$flyover, all_pred$pred2)
+ll_glm3 <- logloss(all_pred$flyover, all_pred$pred3)
+ll_glm3re <- logloss(all_pred$flyover, all_pred$pred3re)
+ll_brt <- logloss(all_pred$flyover, all_pred$predbrt)
+ll_gam <- logloss(all_pred$flyover, all_pred$predgam)
+
+perf <- data.frame(model = c("GLM", "GLMM_0", "GLMM_RE", "BRT", "GAM"),
+                   auc = c(auc_glm2, auc_glm3, auc_glm3re, auc_brt, auc_gam),
+                   ll = c(ll_glm2, ll_glm3, ll_glm3re, ll_brt, ll_gam))
+perf
+
+#3. Plot predictions ----
+wide_pred <- all_pred |> 
+  dplyr::select(flyover, pred3, pred3re, pred2, pred, predbrt, predgam) |> 
+  pivot_longer(-flyover, names_to="model", values_to="prediction")
+
 ggplot(wide_pred) +
   geom_jitter(aes(x=prediction, y=flyover)) +
   geom_smooth(aes(x=prediction, y=flyover)) +
   facet_wrap(~model, ncol=2, scales="free")
 
-#8. Use a Gaussian mixture model to find a truncation ----
+#BRT seems better but concerned about overfitting.... let's try the GAM
+
+#TRUNCATION VALUE ################
+
+#1. Inspect ----
+hist(all_pred$predgam)
+
+#2. Use a Gaussian mixture model to find a truncation ----
 set.seed(1234)
-gmm <- flexmix(pred3re ~ 1 + species_code, data = all_pred, k=2, model = FLXMRglm(family = "gaussian"))
+gmm <- flexmix(predgam ~ 1 + species_code, data = all_pred, k=2, model = FLXMRglm(family = "gaussian"))
 summary(gmm)
 
-#9. Get the membership probabilities ----
+#3. Get the membership probabilities ----
 all_pred$gmm_p <- posterior(gmm)[,1]
-all_pred$gmm_fo <- clusters(gmm)
+all_pred$gmm_fo <- ifelse(all_pred$gmm_p > 0.99, 1, 0)
 
-#10. Look at some things ----
+#4. Look at some things ----
 table(all_pred$flyover, all_pred$gmm_fo)
+ggplot(all_pred) +
+  geom_jitter(aes(x=predgam, y=gmm_p, pch=factor(flyover), colour = factor(gmm_fo)), size=3) +
+  facet_wrap(~flyover)
 
-#MODEL - MACHINE LEARNING #############
+#TRUNCATE THE DATASET ##############
 
-#1. Subset the data ----
-all_brt <- all_cov |> 
-  dplyr::select(flyover, dry_pt:season_20, Family)
+#1. Get the dataset -----
 
-set.seed(1234)
-m.i <- dismo::gbm.step(data=all_brt,
-                       gbm.x=c(2:ncol(all_brt)),
-                       gbm.y=1,
-                       tree.complexity = 3,
-                       learning.rate = 0.01,
-                       family="binomial")
-  
+#2. Read in the GEE covariates ----
 
+#3. Make predictions for each family ----
 
+#4. Create a truncation object ----
+
+#5. Save ----
 

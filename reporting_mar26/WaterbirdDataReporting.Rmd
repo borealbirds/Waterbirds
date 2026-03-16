@@ -33,6 +33,7 @@ Within the Prairie Region of CWS, environmental emergency preparedness is advanc
 ## Goal & Objectives
 
 To support planning and decision-making, the report comprises several analytical objectives that will increase our baseline understanding of waterbird distribution within the region:
+
 1. Compile all available data from surveys in or near wetland habitats in AB, SK and MB;
 2. Determine appropriate methods to harmonize the data from different survey methods into a common data format;
 3. Import these data into WildTrax, an open data platform widely used by ECCC and other organizations;
@@ -44,6 +45,7 @@ To support planning and decision-making, the report comprises several analytical
 ## Deliverables
 
 These objectives will result in the following deliverables:
+
 1. A report describing methods used to harmonize data;
 2. List of WildTrax projects added, including whether each has additional habitat data available;
 3. A report describing methods used to remove surveys in upland habitat types from the dataset;
@@ -51,7 +53,7 @@ These objectives will result in the following deliverables:
 5. A report summarizing basic wetland habitat associations for each waterbird species (for species which are detected in sufficiently large numbers to support analysis);
 6. A report determining the extent of unknown species identifications in recordings (e.g., unknown shorebird, unknown duck), and recommending an approach to reduce the number of such identifications in the future.
 
-All code for this report and the supporting analyses is available in a GitHub repository at https://github.com/borealbirds/Waterbirds.
+All code for this report and the supporting analyses is available in a GitHub repository at [https://github.com/borealbirds/Waterbirds](https://github.com/borealbirds/Waterbirds).
 
 # Data Compilation & Harmonization
 
@@ -60,6 +62,7 @@ The following section describes methods and results for data compilation and har
 ## Datasets
 
 A comprehensive survey of surveys for shorebirds, waterbirds, and marshbirds in or neat wetland habitats in AB, SK, and MB was undertaken. We worked with external agencies to identify potential datasets that are not yet available in WildTrax (e.g., Ducks Unlimited Canada, Audubon Canada, Birds Canada, marsh monitoring program, CWS). We also included surveys from other regions of Canada to inform subsequent analyses. We considered the following data types in our survey:
+
 - Autonomous recording unit (ARU) surveys
 - Point count survey
 - Point count surveys with call playbacks
@@ -68,17 +71,21 @@ A comprehensive survey of surveys for shorebirds, waterbirds, and marshbirds in 
 
 Ten datasets were compiled (Table 1).
 
-```{r datasettable, echo=FALSE}
-datasets <- read.csv("G:/Shared drives/BAM_AvianData/Harmonization/Waterfowl/Dataset inventory - ForReport.csv")
+```{r datasettable, echo=FALSE, message=FALSE, warning = FALSE}
 
-kable(datasets, caption = "Table 1. Datasets included in compilation and harmonization.") |> 
+datasets <- read.csv("G:/Shared drives/BAM_AvianData/Harmonization/Waterfowl/Dataset inventory - ForReport.csv") |> 
+  dplyr::select(-WildTraxID)
+
+kable(datasets, caption = "Datasets included in compilation and harmonization.",
+      longtable = TRUE, booktabs = TRUE) |> 
   row_spec(0, bold = TRUE) |> 
-  kable_styling(full_width=FALSE)
+  kable_styling(latex_options = c("repeat_header"), full_width = FALSE) |> 
+  column_spec(4, width = "4 cm")
 ```
 
 ## Harmonization to WildTrax
 
-The selected datasets were formatted to the format of the WildTrax "main" report for harmonization with other existing datasets. Datasets of ARU or point count style surveys were uploaded to the ARU and point count sensors in WildTrax, respectively, except for the eBird dataset, which is too large for storage in WildTrax. Aerial and plot search surveys were harmonized to the same data schema; however, were stored as .Rdata objects instead of upload to the WildTrax platform to avoid data misinterpreation because there are no appropriate sensors available for those datasets. Those harmonized datasets are available for download from a Google shared drive at https://drive.google.com/drive/folders/1n7lU7vGcl94dbL6ctlcJ1VKwGl9i6b3L. Code produced for data harmonization is available in a public Github repository at https://github.com/borealbirds/WildTrax-dataHarmonization.
+The selected datasets were formatted to the format of the WildTrax "main" report for harmonization with other existing datasets. Datasets of ARU or point count style surveys were uploaded to the ARU and point count sensors in WildTrax, respectively, except for the eBird dataset, which is too large for storage in WildTrax. Aerial and plot search surveys were harmonized to the same data schema; however, were stored as .Rdata objects instead of upload to the WildTrax platform to avoid data misinterpreation because there are no appropriate sensors available for those datasets. Those harmonized datasets are available for download from a Google shared drive at [https://drive.google.com/drive/folders/1n7lU7vGcl94dbL6ctlcJ1VKwGl9i6b3L](https://drive.google.com/drive/folders/1n7lU7vGcl94dbL6ctlcJ1VKwGl9i6b3L). Code produced for data harmonization is available in a public Github repository at [https://github.com/borealbirds/WildTrax-dataHarmonization](https://github.com/borealbirds/WildTrax-dataHarmonization).
 
 ## Harmonization
 
@@ -86,13 +93,11 @@ The new datasets were then harmonized with the "BAM Dataset" (Barker et al. 2015
 
 The resultant dataset comprised 4.67 million surveys: 1.62 M from the BAM dataset, 1.00 M from eBird, and 2.05 M new surveys added through the data compilation and harmonization process, mostly from aerial transect and plot search surveys. The total number of waterbird observations across those surveys was 2.90 M. There were less observations than surveys because the database retained upland surveys where waterbirds were likely undetected; we retained these surveys in the database because they remain important and useful for understanding waterbird habitat relationships and species distribution modelling.
 
-*UPDATE THESE NUMBERS*
-
-```{r datasetsummary, echo=FALSE}
+```{r datasetsummary, echo=FALSE, message=FALSE, warning = FALSE}
 
 families <- read.csv(file.path(root, "results", "FamilySummary.csv"))
 
-kable(families, caption = "Table 2. Percentage of observations in harmonized dataset by waterbird family and survey type.") |> 
+kable(families, caption = "Percentage of observations in harmonized dataset by waterbird family and survey type.") |> 
   row_spec(0, bold = TRUE) |> 
   kable_styling(full_width=FALSE)
 
@@ -104,15 +109,16 @@ kable(families, caption = "Table 2. Percentage of observations in harmonized dat
 For habitat data extraction and subsequent analytical objectives, we filtered the harmonized dataset to just point-level surveys (i.e., ARU and point count surveys; 2.65 M surveys), for which habitat data can be readily extracted and compared across datasets.
 
 We extracted several data sources of wetland habitat for each unique location in the point survey dataset using Google Earth Engine:
+
 - JRC Global Surface Water Version 1.4 (Pekel et al. 2016; 30 m resolution) was extracted as the mean within a 2 km buffer and the mean within a 20 km buffer
--- occurrence: the frequency with which water was present
--- seasonality: the mean number of months water was present
--- recurrence: the frequency with which water returns from year to year between 1984 and 2022
+  - occurrence: the frequency with which water was present
+  - seasonality: the mean number of months water was present
+  - recurrence: the frequency with which water returns from year to year between 1984 and 2022
 - Global Lakes and Wetlands Datavase Version 2 (Lehner et al. 2024; 15 arc second resolution) was extracted as the point value
--- dryland: the percentage that is classified as non-wetland
--- wetlandclass: the dominant wetland class
+  - dryland: the percentage that is classified as non-wetland
+  - wetlandclass: the dominant wetland class
 - C-CAP Wetland Pontential (30 m resolution) was extracted as the mean within a 2 km buffer and the mean within a 20 km buffer
--- wetness: likelihood of wetness
+  - wetness: likelihood of wetness
 
 # Data Cleaning
 
@@ -120,11 +126,12 @@ The following section describes methods and results for data cleaning (Deliverab
 
 ## Unknown Identification Treatment
 
-### Number of Unkwowns
+### Number of Unknowns
 
 First, we compared the frequency of unknown detections between ARU and in-person point count surveys to understand the magnitude of detections that are unknown waterbirds in acoustic recordings. There were approximately 25 times as many unknowns in ARU data as in point count data; however, this may be because unknowns are not consistently reported in point count protocols and/or go ignored by in-person observers due to the inability to pause the survey, as compared with an ARU observer. The majority of unknowns in both survey types were ducks and yellowlegs (Table 3). Unidentified scaup were also common in point count surveys, but not in ARU surveys because this pair of species is almost entirely nonvocal and therefore not well detected by ARUs. Unidentified shorebirds were also common in ARU surveys.
 
-```{r unidsum, echo=FALSE}
+```{r unidsum, echo=FALSE, message=FALSE, warning = FALSE}
+
 unid <- read.csv(file.path(root, "data", "reporting_mar26",  "WaterbirdUnknowns.csv"))
 aru_detections <- 4165022
 pc_detections <- 10732062
@@ -133,7 +140,7 @@ cat("Percent of unknowns in point count data: ", round(nrow(filter(unid, sensor=
 
 cat("Percent of unknowns in ARU data: ", round(nrow(filter(unid, sensor=="ARU"))/aru_detections*100, 3), "%\n")
 ```
-```{r}
+```{r unidtable, echo=FALSE, message=FALSE, warning = FALSE}
 unidsp <- unid |> 
   group_by(sensor, species_common_name) |> 
   summarize(dets = n()) |> 
@@ -146,7 +153,7 @@ unidsp <- unid |>
   pivot_wider(names_from=sensor, values_from = Percent, values_fill = 0) |> 
   rename(`Unknown label` = species_common_name)
 
-kable(unidsp, caption = "Table 3. Percentage of unknown observations in point count and ARU surveys by unknown label.") |> 
+kable(unidsp, caption = "Percentage of unknown observations in point count and ARU surveys by unknown label.") |> 
   row_spec(0, bold = TRUE) |> 
   kable_styling(full_width=FALSE)
 
@@ -158,7 +165,8 @@ We then downloaded the "AI" report for HawkEars from WildTrax for as many record
 
 We downloaded the AI report for 89.6% of unknown identifications in ARU data. For those 89.6% unknown detections, we found matches with HawkEars for 26.9%. In other words, we reduced the proportion of unknowns in the overall dataset from 0.359% to 0.235%. The majority of replacements were of unidentified ducks and yellowlegs (Table 4); HawkEars was not very effective at replacing unidentified shorebird detections. The mean score of detections replaced by HawkEars was 0.69. 
 
-```{r unidai, echo=FALSE}
+```{r unidai, echo=FALSE, message=FALSE, warning = FALSE}
+
 ai <- read.csv(file.path(root, "data", "reporting_mar26", "WaterbirdUnknowns_HawkEarsReplacement.csv"))
 
 aisum <- ai |> 
@@ -176,7 +184,7 @@ aisum <- ai |>
          After = percent,
          `Mean score` = score)
 
-kable(aisum, caption = "Table 4. Percentage of unknown observations in ARU surveys by unknown label before and after HawkEars replacement.") |> 
+kable(aisum, caption = "Percentage of unknown observations in ARU surveys by unknown label before and after HawkEars replacement.") |> 
   row_spec(0, bold = TRUE) |> 
   kable_styling(full_width=FALSE)
 
@@ -190,7 +198,7 @@ Instead of removing all upland surveys from the dataset, which would remove data
 
 We removed high probability flyover observations from the dataset by modeling the probability that an observation was a flyover relative to our extracted habitat covariates from a subset of the point count surveys in the dataset that included and differentiated flyover observations as part of the survey protocol. There were just over 40 thousand observations in the dataset used for modelling flyover probability across nine of the ten waterbird families included in the dataset (Table 5). The total frequency of flyover observations in that dataset was 4.09%.
 
-```{r flyoverdata, echo=FALSE}
+```{r flyoverdata, echo=FALSE, message=FALSE, warning = FALSE}
 fo <- read.csv(file.path(root, "data", "reporting_mar26", "03_FlyoverProbability.csv"))
 
 fosum <- fo |> 
@@ -200,7 +208,7 @@ fosum <- fo |>
   mutate(`Percent flyovers` = `1`/(`0` + `1`)*100) |> 
   dplyr::select(Family, `Percent flyovers`)
 
-kable(fosum, caption = "Table 5. Percentage of observations in point count surveys that were flyovers by waterbird family.") |> 
+kable(fosum, caption = "Percentage of observations in point count surveys that were flyovers by waterbird family.") |> 
   row_spec(0, bold = TRUE) |> 
   kable_styling(full_width=FALSE)
 
@@ -208,7 +216,7 @@ kable(fosum, caption = "Table 5. Percentage of observations in point count surve
 
 We explored several modelling approaches, including logistic regression with and without random intercepts for waterbird family (GLM, GLMM), generalized additive modeling with a random intercept for family (GAM), and boosted regression trees with a fixed effect for family (BRT). We withheld ten percent of the dataset and compared the predictive performance of each modeling approach using the area under the curve of the receiver operating characteristic (ROC AUC) and the log loss likelihood (Likelihood) of the model, both for the training and the testing dataset (Table 6). Overall, the boosted regression tree showed some signs of overfitting via lower performance on the test dataset than the training dataset; however, the performance on the test dataset was still better than any of the other three model types.
 
-```{r flyoverperf, echo = FALSE}
+```{r flyoverperf, echo = FALSE, message=FALSE, warning = FALSE}
 perf <- read.csv(file.path(root, "results", "FlyoverModelPerformance.csv"))
 
 perftable <- perf |> 
@@ -220,7 +228,7 @@ perftable <- perf |>
          Likelihood = ll) |> 
   arrange(Model, Dataset)
 
-kable(perftable, caption = "Table 6. Predictive performance of four models for probability of waterbird flyover on training and testing datasets.") |> 
+kable(perftable, caption = "Predictive performance of four models for probability of waterbird flyover on training and testing datasets.") |> 
   row_spec(0, bold = TRUE) |> 
   kable_styling(full_width=FALSE)
 ```
@@ -228,9 +236,11 @@ kable(perftable, caption = "Table 6. Predictive performance of four models for p
 The wetland covariates extracted with the larger, 20 km radius buffer were the explained the most variation in the boosted regression tree model, particularly the percent dryland variable (18.7% variation explained), with wetland class and waterbird family also explaining 10.7% and 7.4% respectively. The covariates extracted at the 2 km radius each explained about 4% of the total variation explained by the model.
 
 We made predictions for the probability of flyover for each detection in the overall survey dataset using the boosted regression tree model. There were no observations of Haematopodidae (oystercatchers) in the flyover training dataset, so we set observations for that waterbird family to Scolopacidae (sandpipers). We used a threshold of 20% probability of detection to label detections as flyovers for several reasons:
+
 1. There was a break in the distribution of probability estimates at 0.20;
 2. A value of 0.20 maximized the precision and recall of the model;
 3. Thresholding with 0.20 identified approximately 7% of the detections in the dataset as flyovers, which was similar to the proportion in the flyover training dataset.
+
 We removed all waterbird observations over this threshold from the waterbird dataset.
 
 # Data Analysis
@@ -239,19 +249,47 @@ The following section describes methods and results for data analysis (Deliverab
 
 ## Wetland Habitat Associations
 
-We used the entire harmonized and cleaned point survey dataset to summarize habitat relationships for each species with the extracted habitat data. We were interested in a high-level summary of habitat relationships, not density per se, and so we converted the count information in the waterbird dataset to presence/absence and used logistic regression for habitat modelling. We modelled the probability that a species was reported on a given survey relative to the habitat covariates as well as second order polynomials for the hour of day and day of year. For each model, we randomly selected one observation from each cell of a hexagonal grid with 1.86 km spacing to avoid pseudoreplication and overpresentation of highly sampled areas. The dataset for each species was therefore approximately 200,000 observations. We only modelled species with at least 200 detections.
+We used the entire harmonized and cleaned point survey dataset to summarize habitat relationships for each species with the habitat data extracted with a 2km radius and wetland class. We were interested in a high-level summary of habitat relationships, not density per se, and so we converted the count information in the waterbird dataset to presence/absence and used logistic regression  a basic habitat occurrence model. We modelled the probability that a species was reported on a given survey relative to the habitat covariates as well as second order polynomials for the hour of day and day of year. We set the intercept value for wetland class to the upland category. For each model, we randomly selected one observation from each cell of a hexagonal grid with 1.86 km spacing to avoid pseudoreplication and overpresentation of highly sampled areas. The dataset for each species was therefore approximately 200,000 observations. We only modelled species with at least 200 detections.
+
+Most wetland classes had a postive effect on waterbird occurrence, except peatland and streams (Figure 1, Appendix A). Wetland seasonality had a positive effect on waterbird occurrence, while seasonality had a negative effect and only for several species. Both the probability of dryland and the wetness withhin 2 km had mixed effects across species.
+
+```{r habitat, echo=FALSE, message=FALSE, warning = FALSE, fig.height = 5, dpi = 300}
+
+hab <- read.csv(file.path(root, "results", "habitat_prelim_betas.csv")) |> 
+  mutate(category = ifelse(str_sub(covariate, 1, 7)=="wetland", "Wetland class", "Other"),
+         covariate = str_remove(covariate, "wetland"))
+  
+ggplot(hab) + 
+  geom_point(aes(x=covariate, y=Estimate, group=Family, colour=Family),
+             position = position_jitterdodge()) +
+  geom_hline(aes(yintercept=0), linetype="dashed") +
+  facet_wrap(~category, scales="free") +
+  theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1),
+        legend.position = "bottom",
+        plot.title = element_text(size=10)) +
+  xlab("") +
+  ylab("Coefficient estimate") + 
+  ggtitle("Figure 1. Significant coefficient estimates from waterbird occurrence models\nby waterbird Family..")
+
+
+```
+
 
 ## Detection Occurrence Summary
 
 In addition to the initial objectives and deliverables in the statement of work, we reported on one additional component of the waterbird database: detection occurrence. In particular, we were interested in informing which species are detected at a similar occurrence rate with ARU surveys as point count surveys. For each species in the dataset, we calculated the following metrics for ARU surveys and for point count surveys:
+
 -Survey occurrence: the total proportion of surveys during which the species was detected;
 -Site occurrence: the proportion of sites at which the species was detected during at least one survey;
 -Detection rate: the proportion of surveys during which the species was detected for sites where it was detected during at least one survey;
 -Occurrence count: the mean count of the species when detected during a survey.
 
+Our analysis did not account for differences in habitat quality or survey design between survey types and therefore assumes that the two methods have surveyed approximately the same populations across the large dataset; however, the results should be interepreted as broad, preliminary results given this assumption. It should also be noted that some of the point count surveys, particularly the marsh monitoring program, use call playbacks for some species, that likely increased detection occurrence for the point count survey type.
 
+Survey and site occurrence did not differ between method types on average; however, Anatids had higher survey occurrence on point count surveys than ARUs and Gavids, Rallids, and Podicipeds had higher survey and site occurence on ARUs than point count surveys (Figure 2, Appendix B). Detection rate was higher on point count surveys than ARUs; however, this is due to the single-visit nature of most point count survey datasets. Finally, the counts from point count surveys were higher than those from ARU surveys for almost all species, particularly for Anatids and Scolopacids. There were, however, several secretive marsh birds (e.g., yellow rails) that had higher counts on ARU surveys.
 
-```{r occu, echo=FALSE}
+```{r occu, echo=FALSE, message=FALSE, warning = FALSE, fig.height = 7, dpi = 300}
+
 occ <- read.csv(file.path(root, "results", "OccurrenceSummary.csv")) |> 
   mutate(metric = factor(metric, levels = c("survey_occur", "site_occur", "occur_det", "occur_count"),
                          labels = c("Survey occurrence", "Site occurence", "Detection rate", "Occurrence count")))
@@ -260,9 +298,12 @@ ggplot(occ) +
   geom_jitter(aes(y=difference, x=Family, colour=Family)) +
   geom_hline(aes(yintercept=0), linetype="dashed") +
   facet_wrap(~metric, scales="free_y") +
-  theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1)) +
+  theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1),
+        legend.position = "bottom",
+        plot.title = element_text(size=10)) +
   xlab("") +
-  ylab("Difference between point count and ARU surveys")
+  ylab("Difference between point count\nand ARU surveys") + 
+  ggtitle("Figure 2. Difference between survey types (point count minus ARU)\nin ocurrence metrics of waterbirds by family.")
 
 
 ```
@@ -278,3 +319,46 @@ Huus, J., K.G. Kelly, E.M. Bayne, E.C. Knight. 2025. HawkEars: A regional, high-
 Lehner, B., M. Anand, E. Fluet-Chouinard, F. Tan, F. Aires, G.H. Allen, P. Bousquet, J.G. Canadell, N. Davison, M. Ding, et al. 2025. Earth System Science Data 17(6):2277-2329.
 
 Pekel, J.-F., A. Cottam, N. Gorelick, A.S. Belward. 2016. High-resolution mapping of global surfave water and its long-term changes. Nature 540: 418-244.
+
+\newpage
+# Appendix A - Habitat Occurrence Results
+
+```{r habapp, echo=FALSE, message=FALSE, warning = FALSE}
+
+habtable <- read.csv(file.path(root, "results", "habitat_prelim_betas.csv")) |> 
+  mutate(category = ifelse(str_sub(covariate, 1, 7)=="wetland", "Wetland class", "Other")) |> 
+  dplyr::select(-z) |> 
+  rename(Covariate = covariate,
+         `Standard error` = se,
+         P = p,
+         Species = common_name) |> 
+  dplyr::select(Family, Species, Covariate, Estimate, `Standard error`, P) |> 
+  arrange(Family, Species, Covariate)
+
+kable(habtable, longtable = TRUE, booktabs = TRUE,
+      caption = "Results from logistic regression of waterbird occurrence relative to wetland habitat. Results for intercept and temporal covariates are ommitted. The intercept value for wetland class was upland.") |> 
+  row_spec(0, bold = TRUE) |> 
+  kable_styling(full_width=FALSE, latex_options = c("repeat_header"))
+
+```
+
+\newpage
+# Appendix B - Detection Occurrence Results
+
+```{r occuapp, echo=FALSE, message=FALSE, warning = FALSE}
+
+occtable <- read.csv(file.path(root, "results", "OccurrenceSummary.csv")) |> 
+  mutate(metric = factor(metric, levels = c("survey_occur", "site_occur", "occur_det", "occur_count"),
+                         labels = c("Survey occurrence", "Site occurence", "Detection rate", "Occurrence count"))) |> 
+  dplyr::select(Family, common_name, metric, PC, ARU, difference) |> 
+  rename(Species = common_name, Difference = difference, 'Point count' = PC) |> 
+  arrange(Family, Species) |> 
+  mutate(across(c('Point count', ARU, Difference), ~ round(.x, 3)))
+
+kable(occtable, longtable = TRUE, booktabs = TRUE,
+      caption = "Metrics of detection occurrence per species for ARU and point count surveys across the waterbird dataset.") |> 
+  row_spec(0, bold = TRUE) |> 
+  kable_styling(full_width=FALSE, latex_options = c("repeat_header"))
+
+```
+

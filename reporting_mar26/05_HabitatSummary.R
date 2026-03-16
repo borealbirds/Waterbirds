@@ -28,7 +28,7 @@ options(scipen=9999)
 
 #WRANGLING ###############
 
-#1. Split into bird and covs, add temporal ----
+#1. Split into bird and covs, add temporal, standardize... ----
 bird <- dat |> 
   dplyr::select(id, ABDU:YERA)
 
@@ -52,10 +52,10 @@ vif(covs_use) #dang
 #MODEL #############
 
 #1. Set up a loop ----
-spp <- sort(colnames(bird |> dplyr::select(-id)))
-for(i in 1:length(spp)){
+spplist <- sort(colnames(bird |> dplyr::select(-id)))
+for(i in 1:length(spplist)){
   
-  spp.i <- spp[i]
+  spp.i <- spplist[i]
   
   #2. Get the data ----
   set.seed(i)
@@ -91,66 +91,36 @@ for(i in 1:length(spp)){
 
 #SUMMARIZE############
 
-#1. Set up a loop ----
+#1. List of models ----
+mods <- list.files(file.path(root, "results", "habitat_prelim"))
+
+#2. Set up a loop ----
 sum.list <- list()
-for(i in 1:length(spp)){
+for(i in 1:length(mods)){
   
-  spp.i <- spp[i]
-  
-  #2. Load model ----
-  try.i <- try(load(file.path(root, "results", "habitat_prelim", paste0(spp.i, ".Rdata"))))
-  if(class(try.i)=="try-error"){
-    sum.list[[i]] <- data.frame(spp = spp.i, covariate = "NoModel")
-    next
-  }
-  
-  #3. Get best model ----
-  best.i <- get.models(d.i, 1)[[1]]
-  
+  #3. Load model ----
+  load(file.path(root, "results", "habitat_prelim", mods[i]))
+
   #4. Get summary ----
-  sum.list[[i]] <- data.frame(summary(best.i)[["coefficients"]]) |> 
+  sum.list[[i]] <- data.frame(summary(m.i)[["coefficients"]]) |> 
     rownames_to_column("covariate") |> 
-    mutate(spp = spp.i)
+    mutate(spp = str_sub(mods[i], 1, 4))
   
   cat(i, " ")
   
 }
 
 #5. Output ----
+#rescale the betas zero to 1, remove nonsignificant ones
 sum.out <- data.table::rbindlist(sum.list, fill=TRUE) |> 
   rename(p = 'Pr...z..', z = z.value, se = Std..Error) |> 
-  mutate(across(c(Estimate, se, z, p), ~ round(.x, 3)))
+  mutate(Estimate = case_when(covariate=="uplandp_2km" ~ Estimate *100,
+                              covariate=="wetp_2km" ~ Estimate*10,
+                              !is.na(Estimate) ~ Estimate)) |> 
+  mutate(across(c(Estimate, se, z, p), ~ round(.x, 3))) |> 
+  rename(species_code = spp) |> 
+  left_join(spp) |> 
+  dplyr::filter(!covariate %in% c("(Intercept)", "poly(hour, 2)1", "poly(hour, 2)2", "poly(day, 2)1", "poly(day, 2)2"),
+                p < 0.05) 
 
-#6. Make wide ----
-est.wide <- sum.out |> 
-  dplyr::filter(!covariate=="NoModel") |> 
-  dplyr::select(-se, -z, -p) |> 
-  pivot_wider(names_from=covariate, values_from = Estimate)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+write.csv(sum.out, file.path(root, "results", "habitat_prelim_betas.csv"), row.names = FALSE)

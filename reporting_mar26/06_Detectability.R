@@ -13,6 +13,7 @@
 #1. Load packages----
 library(tidyverse) #data wrangling
 library(detect) #QPAD models
+library(lme4)
 
 #2. Set root path----
 root <- "G:/Shared drives/BAM_WaterbirdModels"
@@ -116,7 +117,9 @@ wide <- out |>
   mutate(difference = PC - ARU) |> 
   rename(species_code = spp) |> 
   left_join(spp) |> 
-  mutate(difference = ifelse(difference > 100, 100, difference))
+  mutate(difference = ifelse(difference > 100, 100, difference))|> 
+  mutate(Family = factor(Family),
+         Family = relevel(Family, "Recurvirostridae"))
 
 write.csv(wide, file.path(root, "results", "OccurrenceSummary.csv"), row.names=FALSE)
   
@@ -127,15 +130,46 @@ ggplot(wide) +
   facet_wrap(~metric, scales="free_y") +
   theme(axis.text.x = element_text(angle = 45, hjust=1, vjust=1))
 
-#3. Test ----
-  
-  
-  
-  
-  
-  
-  
-  
+ggplot(wide) + 
+  geom_histogram(aes(x=difference, fill=Family)) +
+  geom_vline(aes(xintercept = 0)) +
+  facet_grid(Family~metric, scales="free")
 
+#3. Test ----
+
+out_fam <- out |> 
+  rename(species_code = spp) |> 
+  left_join(spp) |> 
+  mutate(Family = factor(Family),
+         Family = relevel(Family, "Recurvirostridae"))
+
+m1 <- lmer(survey_occur ~ sensor*Family + (1|species_code), data=out_fam)
+car::Anova(m1, type=3)  
+summary(m1)
+  
+m2 <- lmer(site_occur ~ sensor*Family + (1|species_code), data=out_fam)
+car::Anova(m2, type=3)
+summary(m2)
+
+m3 <- lmer(occur_count ~ sensor*Family + (1|species_code), data=out_fam)
+car::Anova(m3, type=3)
+
+m4 <- lmer(occur_det ~ sensor*Family + (1|species_code), data=out_fam)
+car::Anova(m4, type=3)  
+
+m1 <- lm(difference ~ Family, data=dplyr::filter(wide, metric=="survey_occur"))  
+summary(m1)  
+
+occur.count <- dplyr::filter(wide, metric=="occur_count")
+t.test(occur.count$ARU, occur.count$PC, paired=TRUE)  
+
+occur.det <- dplyr::filter(wide, metric=="occur_det")
+t.test(occur.det$ARU, occur.det$PC, paired=TRUE) 
+
+site.occur <- dplyr::filter(wide, metric=="site_occur")
+t.test(site.occur$ARU, site.occur$PC, paired=TRUE)   
+  
+survey.occur <- dplyr::filter(wide, metric=="survey_occur")
+t.test(survey.occur$ARU, survey.occur$PC, paired=TRUE)   
 
   

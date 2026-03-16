@@ -61,7 +61,7 @@ The following section describes methods and results for data compilation and har
 
 ## Datasets
 
-A comprehensive survey of surveys for shorebirds, waterbirds, and marshbirds in or neat wetland habitats in AB, SK, and MB was undertaken. We worked with external agencies to identify potential datasets that are not yet available in WildTrax (e.g., Ducks Unlimited Canada, Audubon Canada, Birds Canada, marsh monitoring program, CWS). We also included surveys from other regions of Canada to inform subsequent analyses. We considered the following data types in our survey:
+A comprehensive survey of surveys for shorebirds, waterbirds, and marshbirds in or near wetland habitats in AB, SK, and MB was undertaken. We worked with external agencies to identify potential datasets that are not yet available in WildTrax (e.g., Ducks Unlimited Canada, Audubon Canada, Birds Canada, marsh monitoring program, CWS). We also included surveys from other regions of Canada to inform subsequent analyses. We considered the following data types in our survey:
 
 - Autonomous recording unit (ARU) surveys
 - Point count survey

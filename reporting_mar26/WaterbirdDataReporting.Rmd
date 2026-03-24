@@ -12,8 +12,6 @@ library(knitr)
 library(kableExtra)
 
 root <- "G:/Shared drives/BAM_WaterbirdModels"
-
-
 ```
 
 # Background
@@ -61,15 +59,16 @@ The following section describes methods and results for data compilation and har
 
 ## Datasets
 
-A comprehensive survey of surveys for shorebirds, waterbirds, and marshbirds in or near wetland habitats in AB, SK, and MB was undertaken. We worked with external agencies to identify potential datasets that are not yet available in WildTrax (e.g., Ducks Unlimited Canada, Audubon Canada, Birds Canada, marsh monitoring program, CWS). We also included surveys from other regions of Canada to inform subsequent analyses. We considered the following data types in our survey:
+A comprehensive survey of surveys for shorebirds, waterbirds, and marshbirds in or near wetland habitats in AB, SK, and MB was undertaken. We worked with external agencies to identify potential datasets that are not yet available in WildTrax (e.g., Ducks Unlimited Canada, Audubon Canada, Birds Canada, Canadian Wildlife Service). We also included surveys from other regions of Canada to inform subsequent analyses. We considered the following data types in our survey:
 
 - Autonomous recording unit (ARU) surveys
 - Point count survey
 - Point count surveys with call playbacks
 - Aerial surveys
 - Plot search surveys
+- Transect surveys
 
-Ten datasets were compiled (Table 1).
+Thirteen datasets were compiled (Table 1).
 
 ```{r datasettable, echo=FALSE, message=FALSE, warning = FALSE}
 
@@ -91,7 +90,7 @@ The selected datasets were formatted to the format of the WildTrax "main" report
 
 The new datasets were then harmonized with the "BAM Dataset" (Barker et al. 2015), a collection of over 1.5 million bird surveys from across Canada to produce a comprehensive dataset of bird surveys. Following the definition of waterbirds as waterfowl, shorebirds, and marsh birds (i.e., excluding colonial waterbirds), we filtered the dataset to 142 species in 10 bird familes (Table 2): Anatidae (ducks and geese), Scolopacidae (sandpipers), Charadriidae (plovers), Recurvirostridae (stilts and avocets), Haematopodidae (osytercatches), Phalarapodidae (phalaropes), Rallidae (rails and coots), Ardeidae (herons and bitterns), Podicipedidae (grebes), and Gaviidae (loons).
 
-The resultant dataset comprised 4.67 million surveys: 1.62 M from the BAM dataset, 1.00 M from eBird, and 2.05 M new surveys added through the data compilation and harmonization process, mostly from aerial transect and plot search surveys. The total number of waterbird observations across those surveys was 2.90 M. There were less observations than surveys because the database retained upland surveys where waterbirds were likely undetected; we retained these surveys in the database because they remain important and useful for understanding waterbird habitat relationships and species distribution modelling.
+The resultant dataset comprised 4.82 million surveys: 1.62 M from the BAM dataset, 1.00 M from eBird, and 2.20 M new surveys added through the data compilation and harmonization process, mostly from aerial transect and plot search surveys. The total number of waterbird observations across those surveys was 2.90 M. There were less observations than surveys because the database retained upland surveys where waterbirds were likely undetected; we retained these surveys in the database because they remain important and useful for understanding waterbird habitat relationships and species distribution modelling.
 
 ```{r datasetsummary, echo=FALSE, message=FALSE, warning = FALSE}
 
@@ -100,10 +99,7 @@ families <- read.csv(file.path(root, "results", "FamilySummary.csv"))
 kable(families, caption = "Percentage of observations in harmonized dataset by waterbird family and survey type.") |> 
   row_spec(0, bold = TRUE) |> 
   kable_styling(full_width=FALSE)
-
-
 ```
-
 
 ## Habitat data extraction 
 For habitat data extraction and subsequent analytical objectives, we filtered the harmonized dataset to just point-level surveys (i.e., ARU and point count surveys; 2.65 M surveys), for which habitat data can be readily extracted and compared across datasets.
@@ -205,7 +201,7 @@ fosum <- fo |>
   group_by(Family, flyover) |> 
   summarize(dets = n()) |> 
   pivot_wider(names_from=flyover, values_from=dets) |> 
-  mutate(`Percent flyovers` = `1`/(`0` + `1`)*100) |> 
+  mutate(`Percent flyovers` = round(`1`/(`0` + `1`)*100, 2)) |> 
   dplyr::select(Family, `Percent flyovers`)
 
 kable(fosum, caption = "Percentage of observations in point count surveys that were flyovers by waterbird family.") |> 
@@ -221,7 +217,9 @@ perf <- read.csv(file.path(root, "results", "FlyoverModelPerformance.csv"))
 
 perftable <- perf |> 
   dplyr::filter(model!="GLMM_0") |> 
-  mutate(model = str_replace(model, "GLMM_RE", "GLMM")) |> 
+  mutate(model = str_replace(model, "GLMM_RE", "GLMM"),
+         auc = round(auc, 3),
+         ll = round(ll, 3)) |> 
   rename(Model = model,
          Dataset = dataset,
          `AUC ROC` = auc,
@@ -307,8 +305,6 @@ ggplot(occ) +
 
 
 ```
-
-
 
 # Literature Cited
 

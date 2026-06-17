@@ -81,6 +81,8 @@ bcmmp_reduced <- bcmmp %>%
                 CollectorNumber, SurveyAreaIdentifier, TimeObservationsStarted, EffortMeasurement2, ObservationCount, ObservationCount2, 
        ObservationCount3, ObservationCount4, ObservationCount5, ObservationCount6, ObservationCount7, ObservationCount8, ObservationCount9, ObservationCount10,
        ObservationCount11, ScientificName, CommonName, SpeciesCode)
+bcmmp_reduced$SurveyAreaIdentifier <- gsub(" ", "", bcmmp_reduced$SurveyAreaIdentifier)
+  
 
 # Validate XY
 #xy_sf <- st_as_sf(accws, coords = c("DecimalLongitude", "DecimalLatitude"))
@@ -284,7 +286,8 @@ drive_upload(media = location_out, path = as_id(dr), name = paste0(organization,
 survey <- BCMMP %>%
   dplyr::select(location, survey_date, survey_duration_method, survey_distance_method, observer, species_code, detection_distance,
                 survey_duration, individual_count, detection_seen, detection_heard, detection_comments) %>%
-  dplyr::rename(durationMethod = survey_duration_method,
+  dplyr::rename(survey_date = surveyDateTime ,
+                durationMethod = survey_duration_method,
                 distanceMethod = survey_distance_method,
                 species = species_code, 
                 distanceband = detection_distance,

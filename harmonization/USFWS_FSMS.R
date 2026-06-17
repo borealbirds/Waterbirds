@@ -17,6 +17,7 @@ library(terra)
 library(sf)
 library(hms)
 library(readxl)
+library(ggplot2)
 
 # config.R store Google Drive ccredential and path to working directory
 source("./config.R")
@@ -202,10 +203,42 @@ FSMS <- survey %>%
 # Create sub folder in 'toUpload' with the organization name
 dr<- drive_get("waterfowl_Rdata/", shared_drive = "BAM_AvianData")
 
-# Save
+# Save .Rdata
 save(FSMS, file = file.path(out_dir, paste0(organization,"_", dataset_code,".RData")))
 report_path <- file.path(out_dir, paste0(organization,"_",dataset_code,".RData"))
 drive_upload(media = report_path, path = as_id(dr), name = paste0(organization,"_",dataset_code,".RData"), overwrite = TRUE) 
 
+## Save WT upload location 
+location <- FSMS %>%
+  dplyr::select(organization, location, longitude, latitude, location_buffer_m) %>%
+  dplyr::rename(buffer_m = location_buffer_m) %>%
+  mutate(location_visibility = "Visible",
+         true_coordinates = TRUE,
+         location_comments = NA,
+         internal_wildtrax_id = NA)
+
+write.csv(location, file= file.path(out_dir, paste0(organization,"_", dataset_code, "_location.csv")), row.names = FALSE, na = "")
+location_out <- file.path(out_dir, paste0(organization,"_", dataset_code,"_location.csv"))
+drive_upload(media = location_out, path = as_id(dr), name = paste0(organization,"_", dataset_code,"_location.csv"), overwrite = TRUE) 
+
+## Save WT upload survey
+survey <- FSMS %>%
+  dplyr::select(location, survey_date, survey_duration_method, survey_distance_method, observer, species_code, detection_distance,
+                survey_duration, individual_count, detection_seen, detection_heard, detection_comments) %>%
+  dplyr::rename(durationMethod = survey_duration_method,
+                distanceMethod = survey_distance_method,
+                species = species_code, 
+                distanceband = detection_distance,
+                durationinterval= survey_duration, 
+                abundance = individual_count,
+                isHeard = detection_heard,
+                isSeen = detection_seen,
+                comments = detection_comments)
+
+write.csv(survey, file= file.path(out_dir, paste0(organization,"_", dataset_code, "_survey.csv")), row.names = FALSE, na = "")
+survey_out <- file.path(out_dir, paste0(organization,"_", dataset_code,"_survey.csv"))
+drive_upload(media = survey_out, path = as_id(dr), name = paste0(organization,"_", dataset_code,"_survey.csv"), overwrite = TRUE) 
+
+## Save script
 script_path <- file.path(wd, "script", paste0(organization,"_",dataset_code,".R"))
 file.copy(script_path, git_dir, overwrite = TRUE) 

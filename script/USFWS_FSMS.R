@@ -223,7 +223,7 @@ drive_upload(media = location_out, path = as_id(dr), name = paste0(organization,
 
 ## Save WT upload survey
 survey <- FSMS %>%
-  dplyr::select(location, survey_date, survey_duration_method, survey_distance_method, observer, species_code, detection_distance,
+  dplyr::select(location, survey_date, survey_time, survey_duration_method, survey_distance_method, observer, species_code, detection_distance,
                 survey_duration, individual_count, detection_seen, detection_heard, detection_comments) %>%
   dplyr::rename(durationMethod = survey_duration_method,
                 distanceMethod = survey_distance_method,
@@ -233,12 +233,16 @@ survey <- FSMS %>%
                 abundance = individual_count,
                 isHeard = detection_heard,
                 isSeen = detection_seen,
-                comments = detection_comments)
+                comments = detection_comments) %>%
+  mutate(surveyDateTime = paste(survey_date, survey_time, sep = " "))
+
 
 write.csv(survey, file= file.path(out_dir, paste0(organization,"_", dataset_code, "_survey.csv")), row.names = FALSE, na = "")
 survey_out <- file.path(out_dir, paste0(organization,"_", dataset_code,"_survey.csv"))
 drive_upload(media = survey_out, path = as_id(dr), name = paste0(organization,"_", dataset_code,"_survey.csv"), overwrite = TRUE) 
 
-## Save script
+## Save script in GIT and Google Shared Drive
 script_path <- file.path(wd, "script", paste0(organization,"_",dataset_code,".R"))
 file.copy(script_path, git_dir, overwrite = TRUE) 
+script_gd<- drive_get("Waterfowl/scripts/", shared_drive = "BAM_AvianData")
+drive_upload(media = script_path, path = as_id(script_gd), name = paste0(organization,"_",dataset_code,".R"), overwrite = TRUE) 

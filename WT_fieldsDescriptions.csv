@@ -1,0 +1,33 @@
+﻿Table,Field_WT_upload,Field_WT_download (Rdata),Description
+location,organization,organization,Name of the organization
+Rdata only,,project,**fill by Wt at upload. Need to be manually added when saved as Rdata**
+Rdata only,,project_id,**fill by Wt at upload. Use NA in Rdata**
+location,location,location,Name of the location: dataset_code:site
+Rdata only,,location_id,**fill by Wt at upload. Use NA in Rdata**
+location,longitude,longitude,Longitude in NAD83 (EPSG:4326)
+location,latitude,latitude,Latitude in NAD83 (EPSG:4326)
+location,buffer_m,location_buffer_m,"Buffer in m if the owner doesn't want WildTrax to show precise location (i.e.: endangered species), Default value is NA"
+WT location,location_visibility,,"Hidden (the location is only visible to organization members and does not appear on any maps) or  Visible (the location is visible to all users, and appears on maps)"
+WT location,true_coordinates,,"True (if No buffer radius,the true site location is available to the public.If  buffer radius given, the public can only see a random point within a radius specified by the Data Owner) or FALSE (The Data Owner uploaded a buffered location, which will be shared publicly)"
+WT location,location_comments,,Any comments revelant to location
+WT location,internal_wildtrax_id,,NA
+Rdata only,,survey_id,**fill by Wt at upload. Use NA in Rdata**
+Rdata only,,survey_url,**fill by Wt at upload. Use NA in Rdata**
+WT survey,location,,Name of the location: dataset_code:site
+WT survey,surveyDateTime,,Character format: YYYY-mm-dd 00:00:00. Ex: 1995-05-24 07:40:22
+Rdata only,,survey_date,Character format: YYYY-mm-dd. Ex: 1995-05-24
+Rdata only,,survey_time,Character format: 00:00:00. Ex: 07:40:22
+survey,durationMethod,survey_duration_method,see lookupTable duration_method_codes.csv. Use UNKNOWN otherwise
+survey,distanceMethod,survey_distance_method,see lookupTable distance_method_codes.csv. Use UNKNOWN otherwise
+Rdata only,,protocol_type,"Store info on  on Methods that goes beyond what is found in Lookup table: i.e.; Area search 5x5, Modified Transect, …"
+Rdata only,,survey_duration,Store info on survey duration if not found in the duration_method_codes.csv
+survey,observer,observer,Accronyme of the observer. Use obsNA if unknown. Store real name in the master observer table. 
+survey,species,species_code,"see lookupTable species. If the bird doesn't exist, ask Kevin from ABMI to add it and update lookup table."
+Rdata only,,species_common_name,**fill by Wt at upload. Need to be manually added when saved as Rdata**
+Rdata only,,species_scientific_name,**fill by Wt at upload. Need to be manually added when saved as Rdata**
+survey,distanceband,detection_distance,see lookupTable distance_band_codes.csv. Use UNKNOWN otherwise
+survey,durationinterval,detection_time,see lookupTable duration_interval_codes.csv. Use UNKNOWN otherwise
+survey,abundance,individual_count,Count of bird observed
+survey,isSeen,detection_seen,"Yes, No or dnc (did not collect). For waterbirds, mostly Yes."
+survey,isHeard,detection_heard,"Yes, No or dnc (did not collect). For waterbirds, mostly No."
+survey,comments,detection_comments,Any comments revelant to survey

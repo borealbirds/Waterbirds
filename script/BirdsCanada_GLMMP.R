@@ -10,7 +10,7 @@
 #    -ObservationCount5 ="Target species (5-15 min)"
 #    -ObservationCount6 ="Outside/Flythrough"
 #    - Some obs have total count withou any band. Need to be flag before pivot
-#    - drop 18000 non-birds obs
+#    - drop non-birds obs and unknown species_id (n=19)
 #    - Distance band: 100m according to methodology
 #    - Duration ban 0-5min used broadcast
 #    - Duration band 5-10min and 10-15min were silent. 
@@ -47,7 +47,7 @@ WT_spTbl <- read_csv(file.path("./lookupTables/species_codes.csv")) %>%
   dplyr::filter(!species_code %in% c("CORBRA", "PICHUD", "GRAJ", "PSFL", "STETRI", "183"))
 
 # NatudeCount species
-sp_Tbl <- read_excel(file.path("./lookupTables/lu_NatureCounts_species.xlsx"))
+sp_Tbl <- search_species() %>% filter(taxon_group == "BIRDS")
 
 # Load NatureCount species list and drop all non birds
 nc_sp_code <- search_species() %>% dplyr::filter(taxon_group== "BIRDS")
@@ -72,18 +72,9 @@ if (!dir.exists(project_dir)) {
 if (length(list.files(project_dir)) ==0) {
   glmmp <- nc_data_dl(collections = "MMPBIRDS", fields_set = "extended", request_id = r_id, username = natureCounts_username, info = "download Atlas")
   save(glmmp, file = file.path(project_dir, "mmpbirds.RData"))
-  #pid_glmmp <- "https://drive.google.com/drive/u/0/folders/1W0hCa4kgnuNobNa-xFfkc4afP9ABD22d"
-  #gd.list <- drive_ls(as.character(pid_glmmp))
-  #survey_glmmp <- gd.list %>%
-  #  filter(name =="GLMMP.Rdata") %>%
-  #  select("id")
-  #drive_download(as_id(as.character(survey_glmmp)), path = file.path(project_dir, "GLMMP.Rdata"))
 }else{
   load(file.path(project_dir, "mmpbirds.RData"))
 }
-
-#load(file.path(project_dir, "mmpbirds.Rdata"))
-#write.csv(glmmp, "./out/BirdsCanada_GLMMP/raw.csv")
 
 survey <- glmmp %>% 
   dplyr::select(where(~ !all(is.na(.)))) %>%
@@ -92,7 +83,7 @@ survey <- glmmp %>%
   dplyr::inner_join(sp_Tbl, by = "species_id")  %>%# drop all non-birds
   dplyr::select(GlobalUniqueIdentifier, SamplingEventIdentifier, CollectionCode, latitude, longitude, YearCollected, MonthCollected, DayCollected, TimeCollected,                             
                 CollectorNumber, SurveyAreaIdentifier, TimeObservationsStarted, EffortMeasurement1, ObservationCount, ObservationCount2, 
-                ObservationCount3, ObservationCount4, ObservationCount5, ObservationCount6, ScientificName, CommonName, SpeciesCode)
+                ObservationCount3, ObservationCount4, ObservationCount5, ObservationCount6, ScientificName, CommonName, SpeciesCode, english_name)
 
 # Validate XY
 library(ggplot2)
@@ -106,14 +97,13 @@ ggplot() +
 theme_minimal()
 
 # test on species
-glmmp_valid <- survey %>%
-  dplyr::distinct(SpeciesCode, CommonName) %>%
-  rename(species_code = SpeciesCode) %>%
-  left_join(WT_spTbl, by = "species_code")
+glmmp_species <- survey %>%
+  dplyr::distinct(english_name) %>%
+  left_join(WT_spTbl, c("english_name" = "species_common_name"))
 
-invalid_codes <- glmmp_valid %>%
-  filter(is.na(CommonName)) %>%
-  distinct(species_code)
+invalid_codes <- glmmp_species %>%
+  filter(is.na( species_code)) %>%
+  distinct()
 
 invalid_codes
 
@@ -157,24 +147,34 @@ survey.flat <- survey_expanded %>%
                                     variable == "ObservationCount4" ~ "10-15min",
                                     variable == "ObservationCount6" ~ "flyover",
                                     variable == "ObservationCount7" ~ "UNKNOWN"),
-         species_code	= case_when(CommonName == "Northern Yellow Warbler" ~ "YEWA",
-                                  CommonName == "Canada Goose" ~ "CANG",
-                                  CommonName == "moorhen/coot/gallinule sp."  ~ "UNGA",
-                                  CommonName == "American Herring Gull"  ~ "AHGU",
-                                  CommonName == "American Bittern"  ~ "AMBI",
-                                  CommonName == "Green-winged Teal (American)"  ~ "ANACRE",
-                                  CommonName == "Leach's Storm-Petrel"  ~ "LESP" ,
-                                  CommonName == "Ring-necked Pheasant"  ~ "RNEP" ,
-                                  CommonName == "Rock Pigeon (Feral Pigeon)"  ~ "ROPI",
-                                  CommonName == "Nelson's Sparrow"  ~  "NESP",
-                                  CommonName == "Gray Partridge"  ~  "GRAP",
-                                  CommonName == "Eastern Whip-poor-will" ~  "EWPW",
-                                  CommonName == "Dark-eyed Junco" ~  "DEJU",
-                                  CommonName == "Canada Jay" ~  "CAJA",
-                                  CommonName == "Barred Owl" ~  "BAOW",
-                                  CommonName == "swallow sp."  ~ "UNSW",
-                                  CommonName == "Marsh Wren" ~  "MAWR",
-                                  CommonName == "Redpoll (flammea)" ~ "UNRE",
+         species_code	= case_when(english_name  == "Bald Eagle" ~ "BAEA",
+                                  english_name  == "Eastern Warbling Vireo" ~ "WAVI",
+                                  english_name  == "Northern Yellow Warbler"  ~ "YEWA",
+                                  english_name  == "Rock Pigeon (Feral Pigeon)"  ~ "ROPI",
+                                  english_name  == "moorhen/coot/gallinule sp."  ~ "UNGA",
+                                  english_name  == "No species reported"  ~ "NONE",
+                                  english_name  == "duck sp."  ~ "UNDU",
+                                  english_name  == "gull sp."  ~ "UNGU",
+                                  english_name  == "woodpecker sp."  ~ "UNWO",
+                                  english_name  == "swallow sp." ~  "UNSW",
+                                  english_name  == "Alder/Willow Flycatcher (Traill's Flycatcher)"  ~  "UNFL",
+                                  english_name  == "American Crow (Northwestern)"  ~ "AMCR",
+                                  english_name  == "Hudsonian Whimbrel"  ~ "WHIM",
+                                  english_name  == "new world flycatcher sp."  ~ "UNFL",
+                                  english_name  == "Eastern Screech-Owl"  ~ "EASO",
+                                  english_name  == "swan sp." ~  "USWN",
+                                  english_name  == "Green-winged Teal (American)"  ~  "GWTE",
+                                  english_name  == "Western House-Martin" ~  "COHM",
+                                  english_name  == "Scolopacidae sp." ~  "UNSH",
+                                  english_name  == "Spotted/Eastern Towhee (Rufous-sided Towhee)" ~  "USET",
+                                  english_name  == "blackbird sp." ~  "UNBL",
+                                  english_name  == "new world sparrow sp."  ~ "UNSP" ,
+                                  english_name  == "bird sp." ~ "UNBI" ,
+                                  english_name  == "Western Flycatcher (Cordilleran)"  ~ "WEFL" ,
+                                  english_name  == "solitary vireo sp." ~  "SOVI",
+                                  english_name  == "Redpoll (flammea)" ~ "UNRE",
+                                  english_name  == "scoter sp." ~ "USCT",
+                                  english_name  == "Bullock's/Baltimore Oriole" ~ "UNOR",
                                   TRUE ~ species_code),
          species_scientific_name	= scientific_name,
          ind_count	= abundance,
